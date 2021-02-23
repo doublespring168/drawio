@@ -573,6 +573,114 @@ mxStencilRegistry.allowEval = false;
 			}
 		};
 		
+		function createGraph()
+		{
+			var graph = new Graph();
+	        graph.setExtendParents(false);
+	        graph.setExtendParentsOnAdd(false);
+	        graph.setConstrainChildren(false);
+	        graph.setHtmlLabels(true);
+	        graph.getModel().maintainEdgeParent = false;
+	        return graph;
+		};
+		
+		function cloneMxCLipboardToSys()
+		{
+			var cells = mxClipboard.getCells();
+			
+			if (cells && cells.length > 0)
+			{
+				try
+				{
+					var tmpGraph = createGraph();
+					tmpGraph.importCells(cells, 0, 0, tmpGraph.getDefaultParent());
+					const electron = require('electron');
+					var remote = electron.remote;
+					var clipboard = remote.clipboard;
+					var codec = new mxCodec();
+		            var node = codec.encode(tmpGraph.getModel());
+		            var modelString = mxUtils.getXml(node);
+					clipboard.writeText(encodeURIComponent(modelString));
+				}
+				catch(e)
+				{
+					//Ignore
+				} 
+			}
+		};
+		
+		function cloneSysCLipboardToMx()
+		{
+			try
+			{
+				const electron = require('electron');
+				var remote = electron.remote;
+				var clipboard = remote.clipboard;
+				var modelString = clipboard.readText(); 
+				
+				if (modelString)
+				{
+					modelString = decodeURIComponent(modelString);
+					var xmlDoc = mxUtils.parseXml(modelString);
+					var tmpGraph = createGraph();
+					var codec = new mxCodec(xmlDoc);
+					var model = tmpGraph.getModel();
+					codec.decode(xmlDoc.documentElement, model);
+					mxClipboard.setCells(model.root.children[0].children);
+				}
+			}
+			catch(e)
+			{
+				//Ignore, the contents of mxClipboard will be used
+			}
+		};
+		
+		//Set system clipboard on menu copy/cut
+		var origCut = this.actions.get('cut').funct;
+		
+		editorUi.actions.addAction('cut', function()
+		{
+			origCut();
+			cloneMxCLipboardToSys();
+		}, null, 'sprite-cut', Editor.ctrlKey + '+X');
+		
+		var origCopy = this.actions.get('copy').funct;
+		
+		editorUi.actions.addAction('copy', function()
+		{
+			origCopy();
+			cloneMxCLipboardToSys();
+		}, null, 'sprite-copy', Editor.ctrlKey + '+C');
+		
+		//Get data from system clipboard for pase/pasteHere
+		var origPaste = this.actions.get('paste').funct;
+		
+		editorUi.actions.addAction('paste', function()
+		{
+			cloneSysCLipboardToMx();
+			origPaste();
+		}, false, 'sprite-paste', Editor.ctrlKey + '+V');
+	
+		var origPasteHere = this.actions.get('pasteHere').funct;
+
+		editorUi.actions.addAction('pasteHere', function()
+		{
+			cloneSysCLipboardToMx();
+			origPasteHere();
+		});
+		
+		//Enable paste action even if mxClipboard is empty! TODO Is this OK?
+		editorUi.updatePasteActionStates = function()
+		{
+			var graph = this.editor.graph;
+			var paste = this.actions.get('paste');
+			var pasteHere = this.actions.get('pasteHere');
+			
+			paste.setEnabled(this.editor.graph.cellEditor.isContentEditing() || 
+					(graph.isEnabled() && !graph.isCellLocked(graph.getDefaultParent())));
+			pasteHere.setEnabled(paste.isEnabled());
+		};
+		
 		editorUi.actions.addAction('plugins...', function()
 		{
 			editorUi.showDialog(new PluginsDialog(editorUi, function(callback)
@@ -1250,6 +1358,17 @@ mxStencilRegistry.allowEval = false;
 	
 	LocalFile.prototype.saveFile = function(revision, success, error, unloading, overwrite)
 	{
+		//Safeguard in case saveFile is called from online code in the future
+		if (typeof success !== 'function')
+		{
+			if (typeof unloading === 'function')
+			{
+				//Call error
+				unloading({message: 'This is a bug, please report!'}); //Original draw.io function parameters are (title, revision, success, error, useCurrentData)
+			}
+			return;
+		}
+		
 		if (!this.savingFile)
 		{
 			var fn = mxUtils.bind(this, function()
@@ -1666,11 +1785,6 @@ mxStencilRegistry.allowEval = false;
 			var range = null;
 			var allPages = null;
 			
-			if (bounds.width * bounds.height > MAX_AREA || data.length > MAX_REQUEST_SIZE)
-			{
-				throw {message: mxResources.get('drawingTooLarge')};
-			}
-			
 			var embed = '0';
 			
 			if (format == 'pdf' && currentPage == false)
@@ -1752,48 +1866,41 @@ mxStencilRegistry.allowEval = false;
 			var w = Math.floor(bounds.width * s / graph.view.scale);
 			var h = Math.floor(bounds.height * s / graph.view.scale);
 			
-			if (data.length <= MAX_REQUEST_SIZE && w * h < MAX_AREA)
+			editorUi.hideDialog();
+			
+			if ((format == 'png' || format == 'jpg' || format == 'jpeg') && editorUi.isExportToCanvas())
 			{
-				editorUi.hideDialog();
-				
-				if ((format == 'png' || format == 'jpg' || format == 'jpeg') && editorUi.isExportToCanvas())
+				if (format == 'png')
 				{
-					if (format == 'png')
-					{
-						editorUi.exportImage(s, bg == null || bg == 'none', true,
-					   		false, false, b, true, false, null, null, dpi);
-					}
-					else 
-					{
-						editorUi.exportImage(s, false, true,
-							false, false, b, true, false, 'jpeg');
-					}
+					editorUi.exportImage(s, bg == null || bg == 'none', true,
+				   		false, false, b, true, false, null, null, dpi);
 				}
 				else 
 				{
-					var extras = {globalVars: graph.getExportVariables()};
-					
-					editorUi.saveRequest(name, format,
-						function(newTitle, base64)
-						{
-							return new mxElectronRequest('export', {
-								format: format,
-								xml: data,
-								bg: (bg != null) ? bg : mxConstants.NONE,
-								filename: (newTitle != null) ? newTitle : null,
-								w: w,
-								h: h,
-								border: b,
-								base64: (base64 || '0'),
-								extras: JSON.stringify(extras),
-								dpi: dpi > 0? dpi : null
-							}); 
-						});
+					editorUi.exportImage(s, false, true,
+						false, false, b, true, false, 'jpeg');
 				}
 			}
-			else
+			else 
 			{
-				mxUtils.alert(mxResources.get('drawingTooLarge'));
+				var extras = {globalVars: graph.getExportVariables()};
+				
+				editorUi.saveRequest(name, format,
+					function(newTitle, base64)
+					{
+						return new mxElectronRequest('export', {
+							format: format,
+							xml: data,
+							bg: (bg != null) ? bg : mxConstants.NONE,
+							filename: (newTitle != null) ? newTitle : null,
+							w: w,
+							h: h,
+							border: b,
+							base64: (base64 || '0'),
+							extras: JSON.stringify(extras),
+							dpi: dpi > 0? dpi : null
+						}); 
+					});
 			}
 		}
 	};

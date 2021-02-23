@@ -12,14 +12,43 @@ if (!mxIsElectron && location.protocol !== 'http:')
 	{
 		var csp = 'default-src \'self\'; ' +
 			// storage.googleapis.com is needed for workbox-service-worker
-			'script-src %script-src% \'self\' https://storage.googleapis.com ' +
+			'script-src %script-src% \'self\' https://viewer.diagrams.net https://storage.googleapis.com ' +
 				'https://apis.google.com https://*.pusher.com https://code.jquery.com ' +
-				// Bootstrap script in index.html (checked for changes in App.main
-				// in dev mode to avoid deployment without updating this SHA)
+				// Below are the SHAs of the two script blocks in index.html.
+				// These must be updated here and in the CDN after changes.
+				//----------------------------------------------------------//
+				//------------- Bootstrap script in index.html -------------//
+				//----------------------------------------------------------//
+				'\'sha256-8HtpzsH4zj5+RKfTWMxPmWJKBu0OYbn+WuPrLbVky+g=\' ' +
+				// Version 14.1.1
+				'\'sha256-gCA3yqbX5kV5cXQOyvSd4v54e8cOLCBlaKU4tuhJF3Y=\' ' +
+				// Version 14.0.1
+				'\'sha256-ZMnCMK9Jg5ijd0Viqw4KAFn39HeC1LrVwervb9uC7Mo=\' ' +
+				// Version 14.0.0
+				'\'sha256-KgVey3Yy0LCtaUZnD77KXAark2kZ3wS5HGa+tyAkR28=\' ' +
+				// Version 13.8.2
+				'\'sha256-1k6pyjDIKgd1KTCRcmDfV6Yc9vgQexHRTiO4zUBoKg8=\' ' +
+				// Version 13.8.1
+				'\'sha256-/fZb/J4FQmI/TwyxqJbvALWSyGVEvnTrlj4ZTzZNKzI=\' ' +
+				// Version 13.7.9
+				'\'sha256-P4E8pNUYsln6/EUZppjCCe8y8lelBYTfsSyLjjFCE5g=\' ' +
+				// Version 13.7.5
+				'\'sha256-+CrvFhadGyk1VjhHM/t3R88LNSEKManW3TGSZi9fmHQ=\' ' +
+				// Versions before 13.7.5
 				'\'sha256-JqdgAC+ydIDMtmQclZEqgbw94J4IeABIfXAxwEJGDJs=\' ' +
-				// App.main script in index.html
-				'\'sha256-4Dg3/NrB8tLC7TUSCbrtUDWD/J6bSLka01GHn+qtNZ0=\'; ' +
-			'connect-src %connect-src% \'self\' https://*.draw.io https://*.diagrams.net https://*.googleapis.com wss://*.pusher.com https://*.pusher.com ' +
+				//---------------------------------------------------------//
+				//------------- App.main script in index.html -------------//
+				//---------------------------------------------------------//
+				// Version 13.8.2
+				'\'sha256-vS/MxlVD7nbY7AnV+0t1Ap338uF7vrcs7y23KjERhKc=\' ' +
+				// Version 13.7.5
+				'\'sha256-dIEi9UhRQPcyoE9/RPfkIPLe2mSS8oQzwabGMLAZzGE=\' ' +
+				// Versions before 13.7.5
+				'\'sha256-4Dg3/NrB8tLC7TUSCbrtUDWD/J6bSLka01GHn+qtNZ0=\' ' +
+				//---------------------------------------------------------//
+				'; ' +
+			'connect-src %connect-src% \'self\' https://*.draw.io https://*.diagrams.net ' +
+				'https://*.googleapis.com wss://*.pusher.com https://*.pusher.com ' +
 				'https://api.github.com https://raw.githubusercontent.com https://gitlab.com ' +
 				'https://graph.microsoft.com https://*.sharepoint.com  https://*.1drv.com ' +
 				'https://*.google.com https://fonts.gstatic.com https://fonts.googleapis.com; ' +
@@ -34,7 +63,7 @@ if (!mxIsElectron && location.protocol !== 'http:')
 			// Adds script tags and loads shapes with eval
 			replace(/%script-src%/g, 'https://www.dropbox.com https://api.trello.com https://devhost.jgraph.com \'unsafe-eval\'').
 			// Adds Trello and Dropbox backend storage
-			replace(/%connect-src%/g, 'https://*.dropboxapi.com https://api.trello.com').
+			replace(/%connect-src%/g, 'https://*.dropboxapi.com https://trello.com https://api.trello.com').
 			// Loads common.css from mxgraph
 			replace(/%style-src%/g, 'https://devhost.jgraph.com').
 			replace(/%frame-src%/g, '').
@@ -44,20 +73,19 @@ if (!mxIsElectron && location.protocol !== 'http:')
 		if (urlParams['print-csp'] == '1')
 		{
 			console.log('Content-Security-Policy')
-			console.log('Development:', devCsp)
 			console.log('app.diagrams.net:',
 				csp.replace(/%script-src%/g, 'https://www.dropbox.com https://api.trello.com').
 				replace(/%connect-src%/g, 'https://*.dropboxapi.com https://api.trello.com').
 				replace(/%frame-src%/g, '').
 					replace(/%style-src%/g, '').
 					replace(/  /g, ' '));
-			console.log('confluence.draw.io:',
+			console.log('ac.draw.io:',
 				csp.replace(/%script-src%/g, 'https://aui-cdn.atlassian.com https://connect-cdn.atl-paas.net https://ajax.googleapis.com').
 					replace(/%frame-src%/g, 'https://www.lucidchart.com https://app.lucidchart.com').
 					replace(/%style-src%/g, 'https://aui-cdn.atlassian.com https://*.atlassian.net').
 					replace(/%connect-src%/g, '').
 					replace(/  /g, ' '));
-			console.log('jira.draw.io:',
+			console.log('aj.draw.io:',
 				csp.replace(/%script-src%/g, 'https://connect-cdn.atl-paas.net').
 					replace(/%frame-src%/g, '').
 					replace(/%style-src%/g, 'https://aui-cdn.atlassian.com https://*.atlassian.net').
@@ -65,6 +93,7 @@ if (!mxIsElectron && location.protocol !== 'http:')
 					replace(/  /g, ' '));
 			console.log('import.diagrams.net:', 'default-src \'self\'; worker-src blob:; img-src \'self\' blob: data: https://www.lucidchart.com ' +
 					'https://app.lucidchart.com; style-src \'self\' \'unsafe-inline\'; frame-src https://www.lucidchart.com https://app.lucidchart.com;');
+			console.log('Development:', devCsp)
 		}
 	})();
 }
@@ -106,11 +135,13 @@ mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-AWS3D.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-AWS4.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-AWS4b.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Azure.js');
+mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Azure2.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Basic.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Bootstrap.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-BPMN.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-C4.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Cabinet.js');
+mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Cisco.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Cisco19.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-CiscoSafe.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Citrix.js');
@@ -137,9 +168,11 @@ mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Network.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Office.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-PID.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Rack.js');
+mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Signs.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Sitemap.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Sysml.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-ThreatModeling.js');
+mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-UML25.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Veeam.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-Veeam2.js');
 mxscript(drawDevUrl + 'js/diagramly/sidebar/Sidebar-VVD.js');
@@ -155,6 +188,7 @@ mxscript(drawDevUrl + 'js/diagramly/StorageFile.js');
 mxscript(drawDevUrl + 'js/diagramly/StorageLibrary.js');
 mxscript(drawDevUrl + 'js/diagramly/RemoteFile.js');
 mxscript(drawDevUrl + 'js/diagramly/RemoteLibrary.js');
+mxscript(drawDevUrl + 'js/diagramly/EmbedFile.js');
 mxscript(drawDevUrl + 'js/diagramly/Dialogs.js');
 mxscript(drawDevUrl + 'js/diagramly/Editor.js');
 mxscript(drawDevUrl + 'js/diagramly/EditorUi.js');
@@ -182,6 +216,7 @@ mxscript(drawDevUrl + 'js/diagramly/GitHubClient.js');
 mxscript(drawDevUrl + 'js/diagramly/OneDriveFile.js');
 mxscript(drawDevUrl + 'js/diagramly/OneDriveLibrary.js');
 mxscript(drawDevUrl + 'js/diagramly/OneDriveClient.js');
+mxscript(drawDevUrl + 'js/onedrive/mxODPicker.js');
 mxscript(drawDevUrl + 'js/diagramly/TrelloFile.js');
 mxscript(drawDevUrl + 'js/diagramly/TrelloLibrary.js');
 mxscript(drawDevUrl + 'js/diagramly/TrelloClient.js');

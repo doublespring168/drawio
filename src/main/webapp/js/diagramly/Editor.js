@@ -4,15 +4,20 @@
  */
 (function()
 {
-	/**
-	 * Enables paste from Lucidchart
-	 */
 	if (typeof html4 !== 'undefined')
 	{
+		/**
+		 * Enables paste from Lucidchart
+		 */
 		html4.ATTRIBS["span::data-lucid-content"] = 0;
 		html4.ATTRIBS["span::data-lucid-type"] = 0;
+		
+		/**
+		 * Enables custom fonts in labels.
+		 */
+		html4.ATTRIBS['font::data-font-src'] = 0;
 	}
-
+	
 	/**
 	 * Specifies the app name. Default is document.title.
 	 */
@@ -22,12 +27,12 @@
 	 * Known file types.
 	 */
 	Editor.prototype.diagramFileTypes = [
-		{description: 'diagramXmlDesc', extension: 'drawio'},
-		{description: 'diagramPngDesc', extension: 'png'},
-		{description: 'diagramSvgDesc', extension: 'svg'},
-		{description: 'diagramHtmlDesc', extension: 'html'},
-		{description: 'diagramXmlDesc', extension: 'xml'}];
-	
+		{description: 'diagramXmlDesc', extension: 'drawio', mimeType: 'text/xml'},
+		{description: 'diagramPngDesc', extension: 'png', mimeType: 'image/png'},
+		{description: 'diagramSvgDesc', extension: 'svg', mimeType: 'image/svg'},
+		{description: 'diagramHtmlDesc', extension: 'html', mimeType: 'text/html'},
+		{description: 'diagramXmlDesc', extension: 'xml', mimeType: 'text/xml'}];
+
 	/**
 	 * Known file types.
 	 */
@@ -189,6 +194,11 @@
 	Editor.svgBrokenImage = Graph.createSvgImage(10, 10, '<rect x="0" y="0" width="10" height="10" stroke="#000" fill="transparent"/><path d="m 0 0 L 10 10 L 0 10 L 10 0" stroke="#000" fill="transparent"/>');
 
 	/**
+	 * Error image for not found images
+	 */	
+	Editor.errorImage = 'data:image/gif;base64,R0lGODlhEAAQAPcAAADGAIQAAISEhP8AAP///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////yH5BAEAAAAALAAAAAAQABAAAAhoAAEIFBigYMGBCAkGGMCQ4cGECxtKHBAAYUQCEzFSHLiQgMeGHjEGEAAg4oCQJz86LCkxpEqHAkwyRClxpEyXGmGaREmTIsmOL1GO/DkzI0yOE2sKIMlRJsWhCQHENDiUaVSpS5cmDAgAOw==';
+	
+	/**
 	 * Default value for custom libraries in mxSettings.
 	 */
 	Editor.defaultCustomLibraries = [];
@@ -202,6 +212,14 @@
 	 * Specifies if custom properties should be enabled.
 	 */
 	Editor.enableCustomProperties = true;
+	
+	/**
+	 * Specifies if custom properties should be enabled.
+	 */
+	Editor.enableServiceWorker = urlParams['pwa'] != '0' &&
+		'serviceWorker' in navigator && (urlParams['offline'] == '1' ||
+		/.*\.diagrams\.net$/.test(window.location.hostname) ||
+		/.*\.draw\.io$/.test(window.location.hostname));
 
 	/**
 	 * Specifies if XML files should be compressed. Default is true.
@@ -333,7 +351,8 @@
         {name: 'cloneable', dispName: 'Cloneable', type: 'bool', defVal: true},
         {name: 'deletable', dispName: 'Deletable', type: 'bool', defVal: true},
         {name: 'orthogonalLoop', dispName: 'Loop Routing', type: 'bool', defVal: false},
-        {name: 'noJump', dispName: 'No Jumps', type: 'bool', defVal: false}
+        {name: 'noJump', dispName: 'No Jumps', type: 'bool', defVal: false},
+        {name: 'flowAnimation', dispName: 'Flow Animation', type: 'bool', defVal: false}
 	].concat(Editor.commonProperties);
 
 	/**
@@ -372,7 +391,8 @@
         {name: 'fillOpacity', dispName: 'Fill Opacity', type: 'int', min: 0, max: 100, defVal: 100},
         {name: 'strokeOpacity', dispName: 'Stroke Opacity', type: 'int', min: 0, max: 100, defVal: 100},
         {name: 'overflow', dispName: 'Text Overflow', defVal: 'visible', type: 'enum',
-        	enumList: [{val: 'visible', dispName: 'Visible'}, {val: 'hidden', dispName: 'Hidden'}, {val: 'fill', dispName: 'Fill'}, {val: 'width', dispName: 'Width'}]
+        	enumList: [{val: 'visible', dispName: 'Visible'}, {val: 'hidden', dispName: 'Hidden'}, {val: 'block', dispName: 'Block'},
+        		{val: 'fill', dispName: 'Fill'}, {val: 'width', dispName: 'Width'}]
         },
         {name: 'noLabel', dispName: 'Hide Label', type: 'bool', defVal: false},
         {name: 'labelPadding', dispName: 'Label Padding', type: 'float', defVal: 0},
@@ -508,6 +528,11 @@
 		'#\n' +
 		'# styles: -\n' +
 		'#\n' +
+		'## JSON for variables in styles of the form {"name": "value", "name": "value"} where name is a string\n' +
+		'## that will replace a placeholder in a style.\n' +
+		'#\n' +
+		'# vars: -\n' +
+		'#\n' +
 		'## Optional column name that contains a reference to a named label in labels.\n' +
 		'## Default is the current label.\n' +
 		'#\n' +
@@ -604,10 +629,10 @@
 		'#\n' +
 		'## ---- CSV below this line. First line are column names. ----\n' +
 		'name,position,id,location,manager,email,fill,stroke,refs,url,image\n' +
-		'Evan Miller,CFO,emi,Office 1,,me@example.com,#dae8fc,#6c8ebf,,https://www.draw.io,https://cdn3.iconfinder.com/data/icons/user-avatars-1/512/users-9-2-128.png\n' +
-		'Edward Morrison,Brand Manager,emo,Office 2,Evan Miller,me@example.com,#d5e8d4,#82b366,,https://www.draw.io,https://cdn3.iconfinder.com/data/icons/user-avatars-1/512/users-10-3-128.png\n' +
-		'Ron Donovan,System Admin,rdo,Office 3,Evan Miller,me@example.com,#d5e8d4,#82b366,"emo,tva",https://www.draw.io,https://cdn3.iconfinder.com/data/icons/user-avatars-1/512/users-2-128.png\n' +
-		'Tessa Valet,HR Director,tva,Office 4,Evan Miller,me@example.com,#d5e8d4,#82b366,,https://www.draw.io,https://cdn3.iconfinder.com/data/icons/user-avatars-1/512/users-3-128.png\n';
+		'Tessa Miller,CFO,emi,Office 1,,me@example.com,#dae8fc,#6c8ebf,,https://www.draw.io,https://cdn3.iconfinder.com/data/icons/user-avatars-1/512/users-3-128.png\n' +
+		'Edward Morrison,Brand Manager,emo,Office 2,Tessa Miller,me@example.com,#d5e8d4,#82b366,,https://www.draw.io,https://cdn3.iconfinder.com/data/icons/user-avatars-1/512/users-10-3-128.png\n' +
+		'Alison Donovan,System Admin,rdo,Office 3,Tessa Miller,me@example.com,#d5e8d4,#82b366,"emo,tva",https://www.draw.io,https://cdn3.iconfinder.com/data/icons/user-avatars-1/512/users-2-128.png\n' +
+		'Evan Valet,HR Director,tva,Office 4,Tessa Miller,me@example.com,#d5e8d4,#82b366,,https://www.draw.io,https://cdn3.iconfinder.com/data/icons/user-avatars-1/512/users-9-2-128.png\n';
 
 	/**
 	 * Compresses the given string.
@@ -824,7 +849,7 @@
 			}
 			else
 			{
-				style.fill == '';
+				style.fill = '';
 			}
 			
 			// Applies cell style
@@ -1227,7 +1252,7 @@
 		}
 		else
 		{
-			return pako.deflateRaw(data, {to: 'string'});
+			return Graph.arrayBufferToString(pako.deflateRaw(data));
 		}
 	};
 
@@ -1242,7 +1267,7 @@
 		}
 		else
 		{
-			return pako.inflateRaw(data, {to: 'string'});
+			return pako.inflateRaw(Graph.stringToArrayBuffer(atob(data)), {to: 'string'});
 		}
 	};
 
@@ -1566,8 +1591,8 @@
 					if (value.substring(0, idx) == 'mxGraphModel')
 					{
 						// Workaround for Java URL Encoder using + for spaces, which isn't compatible with JS
-						var xmlData = pako.inflateRaw(value.substring(idx + 2),
-							{to: 'string'}).replace(/\+/g,' ');
+						var xmlData = pako.inflateRaw(Graph.stringToArrayBuffer(
+							value.substring(idx + 2)), {to: 'string'}).replace(/\+/g,' ');
 						
 						if (xmlData != null && xmlData.length > 0)
 						{
@@ -1597,6 +1622,7 @@
 		}
 		catch (e)
 		{
+			console.log('here', e);
 			// ignores decoding errors
 		}
 		
@@ -1654,7 +1680,7 @@
 	
 	/**
 	 * Global configuration of the Editor
-	 * see https://desk.draw.io/solution/articles/16000058316
+	 * see https://www.diagrams.net/doc/faq/configure-diagram-editor
 	 * 
 	 * For defaultVertexStyle, defaultEdgeStyle and defaultLibraries, this must be called before
 	 * mxSettings.load via global config variable window.mxLoadSettings = false.
@@ -1761,6 +1787,17 @@
 			if (config.defaultEdgeStyle != null)
 			{
 				Graph.prototype.defaultEdgeStyle = config.defaultEdgeStyle;
+			}
+
+			// Overrides grid steps
+			if (config.gridSteps != null)
+			{
+				var val = parseInt(config.gridSteps);
+				
+				if (!isNaN(val) && val > 0)
+				{
+					mxGraphView.prototype.gridSteps = val;
+				}
 			}
 			
 			if (config.emptyDiagramXml)
@@ -1875,8 +1912,11 @@
     	return str.replace(new RegExp("^[\\s\"']+", "g"), "").replace(new RegExp("[\\s\"']+$", "g"), "");
     }
     
-	Editor.GOOGLE_FONTS =  'https://fonts.googleapis.com/css?family=';
-	
+    /**
+     * Prefix for URLs that reference Google fonts.
+     */
+	Editor.GOOGLE_FONTS = 'https://fonts.googleapis.com/css?family=';
+    
 	/**
 	 * Alphabet for global unique IDs.
 	 */
@@ -1909,9 +1949,12 @@
 	Editor.prototype.timeout = 25000;
 	
 	/**
-	 * Zoomed mathjax output is causing problems in Safari.
+	 * Mathjax output ignores CSS transforms in Safari (lightbox and normal mode).
+	 * Check the following test case on page 2 before enabling this in production:
+	 * https://devhost.jgraph.com/git/drawio/etc/embed/sf-math-fo-clipping.html?dev=1
+	 * UPDATE: Fixed via position:static CSS override in initMath.
 	 */
-	Editor.prototype.useForeignObjectForMath = !mxClient.IS_SF;
+	Editor.prototype.useForeignObjectForMath = true;
 
 	/**
 	 * Executes the first step for connecting to Google Drive.
@@ -2024,6 +2067,10 @@
 					{
 						console.log('ExtFonts format error: ' + e.message);
 					}
+				}
+				else if (this.graph.extFonts != null && this.graph.extFonts.length > 0)
+				{
+					this.graph.extFonts = [];
 				}
 			}
 	
@@ -2158,122 +2205,140 @@
 			this.graph.isCssTransformsSupported();
 		this.graph.updateCssTransform();
 	};
+	
+	/**
+	 * Overrides relative position to fix clipping bug in Webkit.
+	 */
+	Editor.mathJaxWebkitCss = 'div.MathJax_SVG_Display { position: static; }\n' +
+		'span.MathJax_SVG { position: static !important; }';
 		
 	/**
 	 * Initializes math typesetting and loads respective code.
 	 */
 	Editor.initMath = function(src, config)
 	{
-		src = (src != null) ? src : DRAW_MATH_URL + '/MathJax.js';
-		Editor.mathJaxQueue = [];
-		
-		Editor.doMathJaxRender = function(container)
+		if (typeof(window.MathJax) === 'undefined')
 		{
-			window.setTimeout(function()
-			{
-				if (container.style.visibility != 'hidden')
-				{
-					MathJax.Hub.Queue(['Typeset', MathJax.Hub, container]);
-				}
-			}, 0);
-		};
-		
-		var font = (urlParams['math-font'] != null) ?
-			decodeURIComponent(urlParams['math-font']) :
-			'TeX';
-		
-		config = (config != null) ? config :
-		{
-			jax: ['input/TeX', 'input/MathML', 'input/AsciiMath'].concat(
-				[(urlParams['math-output'] == 'html') ?
-					'output/HTML-CSS' : 'output/SVG']),
-			extensions: ['tex2jax.js', 'mml2jax.js', 'asciimath2jax.js'],
-			TeX: {
-				extensions: ['AMSmath.js', 'AMSsymbols.js', 'noErrors.js', 'noUndefined.js']
-			},
-			'HTML-CSS': {
-				availableFonts: [font],
-				imageFont: null
-			},
-			SVG: {
-				font: font,
-				// Needed for client-side export to work
-				useFontCache: false
-			},
-			// Ignores math in in-place editor
-			tex2jax: {
-				ignoreClass: 'mxCellEditor'
-		  	},
-		  	asciimath2jax: {
-				ignoreClass: 'mxCellEditor'
-		  	}
-		};
-
-		// Disables global typesetting and messages on startup, adds queue for
-		// asynchronous rendering while MathJax is loading
-		window.MathJax =
-		{
-			skipStartupTypeset: true,
-			showMathMenu: false,
-			messageStyle: 'none',
-			AuthorInit: function ()
-			{
-				MathJax.Hub.Config(config);
-				
-				MathJax.Hub.Register.StartupHook('Begin', function()	
-				{	
-					for (var i = 0; i < Editor.mathJaxQueue.length; i++)	
-					{	
-						Editor.doMathJaxRender(Editor.mathJaxQueue[i]);	
-					}	
-				});
-		    }
-		};
-
-		// Adds global enqueue method for async rendering
-		Editor.MathJaxRender = function(container)
-		{
-			// Initial rendering when MathJax finished loading
-			if (typeof(MathJax) !== 'undefined' && typeof(MathJax.Hub) !== 'undefined')
-			{
-				Editor.doMathJaxRender(container);
-			}
-			else
-			{
-				Editor.mathJaxQueue.push(container);
-			}
-		};
-
-		// Adds global clear queue method
-		Editor.MathJaxClear = function()
-		{
+			src = ((src != null) ? src : DRAW_MATH_URL + '/MathJax.js') + '?config=TeX-MML-AM_' +
+				((urlParams['math-output'] == 'html') ? 'HTMLorMML' : 'SVG') + '-full';
 			Editor.mathJaxQueue = [];
-		};
-		
-		// Updates math typesetting after changes
-		var editorInit = Editor.prototype.init;
-		
-		Editor.prototype.init = function()
-		{
-			editorInit.apply(this, arguments);
-			
-			this.graph.addListener(mxEvent.SIZE, mxUtils.bind(this, function(sender, evt)
+
+			Editor.doMathJaxRender = function(container)
 			{
-				if (this.graph.container != null && this.graph.mathEnabled && !this.graph.blockMathRender)
+				window.setTimeout(function()
 				{
-					Editor.MathJaxRender(this.graph.container);
+					if (container.style.visibility != 'hidden')
+					{
+						MathJax.Hub.Queue(['Typeset', MathJax.Hub, container]);
+					}
+				}, 0);
+			};
+			
+			var font = (urlParams['math-font'] != null) ?
+				decodeURIComponent(urlParams['math-font']) : 'TeX';
+			
+			config = (config != null) ? config :
+			{
+				'HTML-CSS': {
+					availableFonts: [font],
+					imageFont: null
+				},
+				SVG: {
+					font: font,
+					// Needed for client-side export to work
+					useFontCache: false
+				},
+				// Ignores math in in-place editor
+				tex2jax: {
+					ignoreClass: 'mxCellEditor'
+				},
+				asciimath2jax: {
+					ignoreClass: 'mxCellEditor'
 				}
-			}));
-		};
-		
-		var tags = document.getElementsByTagName('script');
-		
-		if (tags != null && tags.length > 0)
-		{
-			var script = document.createElement('script');
-			script.type = 'text/javascript';
-			script.src = src;
-			tags[0].parentNode.appendChild(script);
+			};
+
+			// Disables global typesetting and messages on startup, adds queue for
+			// asynchronous rendering while MathJax is loading
+			window.MathJax =
+			{
+				skipStartupTypeset: true,
+				showMathMenu: false,
+				messageStyle: 'none',
+				AuthorInit: function ()
+				{
+					MathJax.Hub.Config(config);
+					
+					MathJax.Hub.Register.StartupHook('Begin', function()	
+					{	
+						for (var i = 0; i < Editor.mathJaxQueue.length; i++)	
+						{	
+							Editor.doMathJaxRender(Editor.mathJaxQueue[i]);	
+						}	
+					});
+				}
+			};
+
+			// Adds global enqueue method for async rendering
+			Editor.MathJaxRender = function(container)
+			{
+				// Initial rendering when MathJax finished loading
+				if (typeof(MathJax) !== 'undefined' && typeof(MathJax.Hub) !== 'undefined')
+				{
+					Editor.doMathJaxRender(container);
+				}
+				else
+				{
+					Editor.mathJaxQueue.push(container);
+				}
+			};
+
+			// Adds global clear queue method
+			Editor.MathJaxClear = function()
+			{
+				Editor.mathJaxQueue = [];
+			};
+			
+			// Updates math typesetting after changes
+			var editorInit = Editor.prototype.init;
+			
+			Editor.prototype.init = function()
+			{
+				editorInit.apply(this, arguments);
+				
+				this.graph.addListener(mxEvent.SIZE, mxUtils.bind(this, function(sender, evt)
+				{
+					if (this.graph.container != null && this.graph.mathEnabled && !this.graph.blockMathRender)
+					{
+						Editor.MathJaxRender(this.graph.container);
+					}
+				}));
+			};
+			
+			var tags = document.getElementsByTagName('script');
+			
+			if (tags != null && tags.length > 0)
+			{
+				var s = document.createElement('script');
+				s.setAttribute('type', 'text/javascript');
+				s.setAttribute('src', src);
+				tags[0].parentNode.appendChild(s);
+			}
+			
+			// Workaround for zoomed math clipping in Webkit
+			try
+			{
+				if (mxClient.IS_GC || mxClient.IS_SF)
+				{
+					var style = document.createElement('style')
+					style.type = 'text/css';
+					style.innerHTML = Editor.mathJaxWebkitCss;
+					document.getElementsByTagName('head')[0].appendChild(style);
+				}
+			}
+			catch (e)
+			{
+				// ignore
+			}
 		}
 	};
 
@@ -2892,9 +2957,9 @@
      */
     Editor.prototype.embedExtFonts = function(callback)
     {
-    	var extFonts = this.graph.extFonts; 
+    	var extFonts = this.graph.getCustomFonts();
     	
-		if (extFonts != null && extFonts.length > 0)
+		if (extFonts.length > 0)
 		{
 			var styleCnt = '', waiting = 0;
 			
@@ -2915,7 +2980,7 @@
 			{
 				(mxUtils.bind(this, function(fontName, fontUrl)
 				{
-					if (fontUrl.indexOf(Editor.GOOGLE_FONTS) == 0)
+					if (Graph.isCssFontUrl(fontUrl))
 					{
 						if (this.cachedGoogleFonts[fontUrl] == null)
 						{
@@ -2943,9 +3008,8 @@
 					else
 					{
 						styleCnt += '@font-face {' +
-				            'font-family: "'+ fontName +'";' + 
-				            'src: url("'+ fontUrl +'");' + 
-				            '}';
+				            'font-family: "' + fontName + '";' + 
+				            'src: url("' + fontUrl + '")}';
 					}
 				}))(extFonts[i].name, extFonts[i].url);
 			}
@@ -3030,11 +3094,25 @@
 	};
 
 	/**
+	 * Returns the maximum possible scale for the given canvas dimension and scale.
+	 * This will return the given scale or the maximum scale that can be used to
+	 * generate a valid image in the current browser.
+	 * 
+	 * See https://developer.mozilla.org/en-US/docs/Web/HTML/Element/canvas
+	 */
+	Editor.prototype.getMaxCanvasScale = function(w, h, scale)
+	{
+		var max = (mxClient.IS_FF) ? 8192 : 16384;
+
+		return Math.min(scale, Math.min(max / w, max / h));
+	};
+	
+	/**
 	 *
 	 */
 	Editor.prototype.exportToCanvas = function(callback, width, imageCache, background, error, limitHeight,
 		ignoreSelection, scale, transparentBackground, addShadow, converter, graph, border, noCrop, grid,
-		keepTheme)
+		keepTheme, exportType)
 	{
 		try
 		{
@@ -3058,11 +3136,12 @@
 			// Handles special case where background is null but transparent is false
 			if (bg == null && transparentBackground == false)
 			{
-				bg = (keepTheme) ? this.graph.defaultPageBackgroundColor : '#ffffff';;
+				bg = (keepTheme) ? this.graph.defaultPageBackgroundColor : '#ffffff';
 			}
 			
 			this.convertImages(graph.getSvg(null, null, border, noCrop, null, ignoreSelection,
-				null, null, null, addShadow, null, keepTheme), mxUtils.bind(this, function(svgRoot)
+				null, null, null, addShadow, null, keepTheme, exportType),
+				mxUtils.bind(this, function(svgRoot)
 			{
 				try
 				{
@@ -3082,6 +3161,7 @@
 								scale = (!limitHeight) ? width / w : Math.min(1, Math.min((width * 3) / (h * 4), width / w));
 							}
 							
+							scale = this.getMaxCanvasScale(w, h, scale);
 							w = Math.ceil(scale * w);
 							h = Math.ceil(scale * h);
 							
@@ -3097,7 +3177,10 @@
 								ctx.fill();
 					   		}
 		
-						    ctx.scale(scale, scale);
+					   		if (scale != 1)
+					   		{
+					   			ctx.scale(scale, scale);
+					   		}
 	
 						    function drawImage()
 						    {
@@ -3414,7 +3497,7 @@
 	 */
 	if (window.ColorDialog)
 	{
-		FilenameDialog.filenameHelpLink = 'https://desk.draw.io/support/solutions/articles/16000091426'; 
+		FilenameDialog.filenameHelpLink = 'https://www.diagrams.net/doc/faq/save-file-formats'; 
 		
 		var colorDialogAddRecentColor = ColorDialog.addRecentColor;
 		
@@ -3838,7 +3921,7 @@
 	            option.style.paddingTop = '5px';
 	            div.appendChild(option);
 	            
-	            var help = ui.menus.createHelpLink('https://desk.draw.io/support/solutions/articles/16000032875');
+	            var help = ui.menus.createHelpLink('https://www.diagrams.net/doc/faq/math-typesetting');
 	            help.style.position = 'relative';
 	            help.style.marginLeft = '6px';
 	            help.style.top = '2px';
@@ -4576,6 +4659,15 @@
 				{
 					td.appendChild(createStaticArrList(pName, pValue, prop.subType, prop.subDefVal, prop.size, row, flipBkg));
 				}
+				else if (pType == 'readOnly')
+				{
+					var inp = document.createElement('input');
+					inp.setAttribute('readonly', '');
+					inp.value = pValue;
+					inp.style.width = '96px';
+					inp.style.borderWidth = '0px';
+					td.appendChild(inp);
+				}
 				else
 				{
 					td.innerHTML = pValue;
@@ -4747,6 +4839,23 @@
 			
 			var isOdd = false;
 			var flipBkg = false;
+			
+			var cellId = null;
+			
+			if (state.vertices.length == 1 && state.edges.length == 0)
+			{
+				cellId = state.vertices[0].id;
+			}
+			else if (state.vertices.length == 0 && state.edges.length == 1)
+			{
+				cellId = state.edges[0].id;
+			}
+			
+			//Add it to top (always)
+			if (cellId != null)
+			{
+				grid.appendChild(createPropertyRow('id', mxUtils.htmlEntities(cellId), {dispName: 'ID', type: 'readOnly'}, true, false));
+			}
 			
 			for (var key in properties)
 			{
@@ -4974,7 +5083,7 @@
 					{
 						if (colorset['gradient'] != null)
 						{
-							if (mxClient.IS_IE && (mxClient.IS_QUIRKS || document.documentMode < 10))
+							if (mxClient.IS_IE && (document.documentMode < 10))
 							{
 						    	btn.style.filter = 'progid:DXImageTransform.Microsoft.Gradient('+
 				                	'StartColorStr=\'' + colorset['fill'] +
@@ -5174,6 +5283,186 @@
 			return div;
 		};
 	}
+	
+	/**
+	 * Lookup table for mapping from font URL and name to elements in the DOM.
+	 */
+	Graph.customFontElements = {};
+		
+	/**
+	 * Lookup table for recent custom fonts.
+	 */
+	Graph.recentCustomFonts = {};
+
+	/**
+	 * Returns true if the given font URL references a Google font.
+	 */
+	Graph.isGoogleFontUrl = function(url)
+	{
+		return url.substring(0, Editor.GOOGLE_FONTS.length) == Editor.GOOGLE_FONTS;
+	};
+
+	/**
+	 * Returns true if the given font URL is a CSS file.
+	 */
+	Graph.isCssFontUrl = function(url)
+	{
+		return Graph.isGoogleFontUrl(url);
+	};
+
+	/**
+	 * Creates the DOM node for the custom font.
+	 */
+	Graph.createFontElement = function(name, url)
+	{
+		var elt = null;
+
+		if (Graph.isCssFontUrl(url))
+		{
+			elt = document.createElement('link');
+			elt.setAttribute('rel', 'stylesheet');
+			elt.setAttribute('type', 'text/css');
+			elt.setAttribute('charset', 'UTF-8');
+			elt.setAttribute('href', url);
+		}
+		else
+		{
+			elt = document.createElement('style');
+			mxUtils.write(elt, '@font-face {\n' +	
+				'font-family: "' + name + '";\n' + 	
+				'src: url("' + url + '");\n}');
+		}
+		
+		return elt;
+	};
+	
+	/**
+	 * Adds a font to the document.
+	 */
+	Graph.addFont = function(name, url, callback)
+	{
+		if (name != null && name.length > 0 && url != null && url.length > 0)
+		{
+			var key = name.toLowerCase();
+			
+			// Blocks UI font from being overwritten
+			if (key != 'helvetica' && name != 'arial' && key != 'sans-serif')
+			{
+				var entry = Graph.customFontElements[key];
+				
+				// Replaces element if URL has changed
+				if (entry != null && entry.url != url)
+				{
+					entry.elt.parentNode.removeChild(entry.elt);
+					entry = null;
+				}
+				
+				if (entry == null)
+				{
+					var realUrl = url;
+					
+					// Fixes possible mixed content by using proxy
+					if (url.substring(0, 5) == 'http:')
+					{
+						realUrl = PROXY_URL + '?url=' + encodeURIComponent(url);
+					}
+
+					entry = {name: name, url: url, elt: Graph.createFontElement(name, realUrl)};
+					Graph.customFontElements[key] = entry;
+					Graph.recentCustomFonts[key] = entry;
+					var head = document.getElementsByTagName('head')[0];
+					
+					if (callback != null)
+					{
+						if (entry.elt.nodeName.toLowerCase() == 'link')
+						{
+							entry.elt.onload = callback;
+							entry.elt.onerror = callback;
+						}
+						else
+						{
+							callback();
+						}
+					}
+						
+					if (head != null)
+					{
+						head.appendChild(entry.elt);
+					}
+				}
+				else if (callback != null)
+				{
+					callback();
+				}
+			}
+		}
+		
+		return name;
+	};
+
+	/**
+	 * Returns the URL for the given font name if it exists in the document.
+	 * Otherwise it returns the given URL.
+	 */
+	Graph.getFontUrl = function(name, url)
+	{
+		var font = Graph.customFontElements[name.toLowerCase()];
+		
+		if (font != null)
+		{
+			url = font.url;
+		}
+		
+		return url;
+	};
+	
+	/**
+	 * Processes the fonts in the given element and its descendants.
+	 */
+	Graph.processFontAttributes = function(elt)
+	{
+		var elts = elt.getElementsByTagName('*');
+		
+		for (var i = 0; i < elts.length; i++)
+		{
+			var url = elts[i].getAttribute('data-font-src');
+			
+			if (url != null)
+			{
+				var name = (elts[i].nodeName == 'FONT') ?
+					elts[i].getAttribute('face') :
+					elts[i].style.fontFamily;
+	
+				if (name != null)
+				{
+					Graph.addFont(name, url);
+				}
+			}
+		}		
+	};
+	
+	/**
+	 * Processes the font in the given cell style.
+	 */
+	Graph.processFontStyle = function(style)
+	{
+		if (style != null)
+		{
+			var url = mxUtils.getValue(style, 'fontSource', null);
+	
+			if (url != null)
+			{
+				var name = mxUtils.getValue(style, mxConstants.STYLE_FONTFAMILY, null);
+				
+				if (name != null)
+				{
+					Graph.addFont(name, decodeURIComponent(url));
+				}
+			}
+		}
+		
+		return style;
+	};
 
 	/**
 	 * Changes the default stylename so that it matches the old named style
@@ -5252,34 +5541,6 @@
 		function setMouseEvent(evt)
 		{
 			mouseEvent = evt;
-			
-			// Workaround for member not found in IE8-
-			try
-			{
-				if (mxClient.IS_QUIRKS || document.documentMode == 7 || document.documentMode == 8)
-				{
-					mouseEvent = document.createEventObject(evt);
-					mouseEvent.type = evt.type;
-					mouseEvent.canBubble = evt.canBubble;
-					mouseEvent.cancelable = evt.cancelable;
-					mouseEvent.view = evt.view;
-					mouseEvent.detail = evt.detail;
-					mouseEvent.screenX = evt.screenX;
-					mouseEvent.screenY = evt.screenY;
-					mouseEvent.clientX = evt.clientX;
-					mouseEvent.clientY = evt.clientY;
-					mouseEvent.ctrlKey = evt.ctrlKey;
-					mouseEvent.altKey = evt.altKey;
-					mouseEvent.shiftKey = evt.shiftKey;
-					mouseEvent.metaKey = evt.metaKey;
-					mouseEvent.button = evt.button;
-					mouseEvent.relatedTarget = evt.relatedTarget;
-				}
-			}
-			catch (e)
-			{
-				// ignores possible event cloning errors
-			}
 		};
 		
 		mxEvent.addListener(this.container, 'mouseenter', setMouseEvent);
@@ -5320,7 +5581,6 @@
 				if (style['childLayout'] == 'rack')
 				{
 					var rackLayout = new mxStackLayout(this.graph, false);
-					
 					var unitSize = 20;
 					
 					if (style['rackUnitSize'] != null)
@@ -5332,13 +5592,14 @@
 						rackLayout.gridSize = (typeof mxRackContainer !== 'undefined') ? mxRackContainer.unitSize : unitSize;
 					}
 					
-					rackLayout.fill = true;
 					rackLayout.marginLeft = style['marginLeft'] || 0;
 					rackLayout.marginRight = style['marginRight'] || 0;
 					rackLayout.marginTop = style['marginTop'] || 0;
 					rackLayout.marginBottom = style['marginBottom'] || 0;
 					rackLayout.allowGaps = style['allowGaps'] || 0;
+					rackLayout.horizontal = mxUtils.getValue(style, 'horizontalRack', '0') == '1';
 					rackLayout.resizeParent = false;
+					rackLayout.fill = true;
 					
 					return rackLayout;
 				}
@@ -5372,6 +5633,100 @@
 		this.updateGlobalUrlVariables();
 	};
 
+	/**
+	 * Adds support for custom fonts in cell styles.
+	 */
+	var graphPostProcessCellStyle = Graph.prototype.postProcessCellStyle;
+	Graph.prototype.postProcessCellStyle = function(style)
+	{
+		return Graph.processFontStyle(graphPostProcessCellStyle.apply(this, arguments));
+	};
+
+	/**
+	 * Handles custom fonts in labels.
+	 */
+	var mxSvgCanvas2DUpdateTextNodes = mxSvgCanvas2D.prototype.updateTextNodes;
+	mxSvgCanvas2D.prototype.updateTextNodes = function(x, y, w, h, align, valign, wrap, overflow, clip, rotation, g)
+	{
+		mxSvgCanvas2DUpdateTextNodes.apply(this, arguments);
+		Graph.processFontAttributes(g);
+	};
+		
+	/**
+	 * Handles custom fonts in labels.
+	 */
+	var mxTextRedraw = mxText.prototype.redraw;
+	mxText.prototype.redraw = function()
+	{
+		mxTextRedraw.apply(this, arguments);
+		
+		// Handles label rendered without foreign object
+		if (this.node != null && this.node.nodeName == 'DIV')
+		{
+			Graph.processFontAttributes(this.node);
+		}
+	};
+
+	/**
+	 * Returns all custom fonts (old and new).
+	 */
+	Graph.prototype.getCustomFonts = function()
+	{
+		var fonts = this.extFonts;
+		
+		if (fonts != null)
+		{
+			fonts = fonts.slice();
+		}
+		else
+		{
+			fonts = [];
+		}
+		
+		for (var key in Graph.customFontElements)
+		{
+			var font = Graph.customFontElements[key];
+			fonts.push({name: font.name, url: font.url});
+		}
+		
+		return fonts;
+	};
+	
+	/**
+	 * Assigns the given custom font to the selected text.
+	 */
+	Graph.prototype.setFont = function(name, url)
+	{
+		// Adds the font element to the document
+		Graph.addFont(name, url);
+		
+		// Only valid known fonts are allowed as parameters so we set
+		// the real font name and the data-source-face in the element
+		// which is used as the face attribute when editing stops
+		// KNOWN: Undo for the DOM change is not working
+		document.execCommand('fontname', false, name);
+
+		// Finds element with new font name and checks its data-font-src attribute
+		if (url != null)
+		{
+			var fonts = this.cellEditor.textarea.getElementsByTagName('font');
+			
+			// Enforces consistent font naming
+			url = Graph.getFontUrl(name, url);
+			
+			for (var i = 0; i < fonts.length; i++)
+			{
+				if (fonts[i].getAttribute('face') == name)
+				{
+					if (fonts[i].getAttribute('data-font-src') != url)
+					{
+						fonts[i].setAttribute('data-font-src', url);
+					}
+				}
+			}
+		}
+	};
+	
 	/**
 	 * Disables fast zoom with shadow in lightbox for Safari
 	 * to work around blank output on retina screen.
@@ -5470,7 +5825,8 @@
 	var graphGetSvg = Graph.prototype.getSvg;
 	
 	Graph.prototype.getSvg = function(background, scale, border, nocrop, crisp,
-		ignoreSelection, showText, imgExport, linkTarget, hasShadow, incExtFonts, keepTheme)
+		ignoreSelection, showText, imgExport, linkTarget, hasShadow,
+		incExtFonts, keepTheme, exportType)
 	{
 		var temp = null;
 		
@@ -5484,9 +5840,10 @@
 		}
 		
 		var result = graphGetSvg.apply(this, arguments);
+		var extFonts = this.getCustomFonts();
 		
-		// Adds extrnal fonts
-		if (incExtFonts && this.extFonts != null && this.extFonts.length > 0)
+		// Adds external fonts
+		if (incExtFonts && extFonts.length > 0)
 		{
 			var svgDoc = result.ownerDocument;
 			var style = (svgDoc.createElementNS != null) ?
@@ -5496,20 +5853,19 @@
 			var prefix = '';
 			var postfix = '';
 			    	
-			for (var i = 0; i < this.extFonts.length; i++)
+			for (var i = 0; i < extFonts.length; i++)
 			{
-				var fontName = this.extFonts[i].name, fontUrl = this.extFonts[i].url;
+				var fontName = extFonts[i].name, fontUrl = extFonts[i].url;
 				
-				if (fontUrl.indexOf(Editor.GOOGLE_FONTS) == 0)
+				if (Graph.isCssFontUrl(fontUrl))
 				{
 					prefix += '@import url(' + fontUrl + ');\n';
 				}
 				else
 				{
 					postfix += '@font-face {\n' +
-			            'font-family: "'+ fontName +'";\n' + 
-			            'src: url("'+ fontUrl +'");\n' + 
-			            '}\n';
+			            'font-family: "' + fontName + '";\n' + 
+			            'src: url("' + fontUrl + '");\n}\n';
 				}				
 			}
 			
@@ -5537,10 +5893,6 @@
 		
 		if (this.mathEnabled)
 		{
-			var graph = this;
-			var origin = graph.container.getBoundingClientRect();
-			var y0 = graph.container.scrollTop - origin.y;
-			var x0 = graph.container.scrollLeft - origin.x;
 			var drawText = imgExport.drawText;
 			
 			// Replaces input with rendered markup
@@ -6295,6 +6647,7 @@
 	mxStencilRegistry.libraries['aws3d'] = [SHAPES_PATH + '/mxAWS3D.js', STENCIL_PATH + '/aws3d.xml'];
 	mxStencilRegistry.libraries['aws4'] = [SHAPES_PATH + '/mxAWS4.js', STENCIL_PATH + '/aws4.xml'];
 	mxStencilRegistry.libraries['aws4b'] = [SHAPES_PATH + '/mxAWS4.js', STENCIL_PATH + '/aws4.xml'];
+	mxStencilRegistry.libraries['uml25'] = [SHAPES_PATH + '/mxUML25.js'];
 	mxStencilRegistry.libraries['veeam'] = [STENCIL_PATH + '/veeam/2d.xml', STENCIL_PATH + '/veeam/3d.xml', STENCIL_PATH + '/veeam/veeam.xml'];
 	mxStencilRegistry.libraries['veeam2'] = [STENCIL_PATH + '/veeam/2d.xml', STENCIL_PATH + '/veeam/3d.xml', STENCIL_PATH + '/veeam/veeam2.xml'];
 	mxStencilRegistry.libraries['pid2inst'] = [SHAPES_PATH + '/pid2/mxPidInstruments.js'];
@@ -6705,6 +7058,14 @@
 					{
 						writeHead.apply(this, arguments);
 						
+						// Workaround for zoomed math clipping in Webkit
+						if (mxClient.IS_GC || mxClient.IS_SF)
+						{
+							doc.writeln('<style type="text/css">');
+							doc.writeln(Editor.mathJaxWebkitCss);
+							doc.writeln('</style>');
+						}
+
 						// Fixes font weight for PDF export in Chrome
 						if (mxClient.IS_GC)
 						{
@@ -6722,26 +7083,26 @@
 							doc.writeln('</style>');
 						}
 						
-						if (thisGraph.extFonts != null)
+						var extFonts = thisGraph.getCustomFonts();
+						
+						for (var i = 0; i < extFonts.length; i++)
 						{
-							for (var i = 0; i < thisGraph.extFonts.length; i++)
+							var fontName = extFonts[i].name;
+							var fontUrl = extFonts[i].url;
+							
+							if (Graph.isCssFontUrl(fontUrl))
 							{
-								var fontName = thisGraph.extFonts[i].name;
-								var fontUrl = thisGraph.extFonts[i].url;
-								
-								if (fontUrl.indexOf(Editor.GOOGLE_FONTS) == 0)
-								{
-							   		doc.writeln('<link rel="stylesheet" href="' + fontUrl + '" charset="UTF-8" type="text/css">');
-								}
-								else
-								{
-							   		doc.writeln('<style type="text/css">');
-							   		doc.writeln('@font-face {\n' +
-								            '\tfont-family: "'+ fontName +'";\n' + 
-								            '\tsrc: url("'+ fontUrl +'");\n' + 
-								            '}');
-							   		doc.writeln('</style>');
-								}
+						   		doc.writeln('<link rel="stylesheet" href="' +
+						   			mxUtils.htmlEntities(fontUrl) +
+						   			'" charset="UTF-8" type="text/css">');
+							}
+							else
+							{
+						   		doc.writeln('<style type="text/css">');
+						   		doc.writeln('@font-face {\n' +
+						   			'font-family: "' + mxUtils.htmlEntities(fontName) + '";\n' + 
+						   			'src: url("' + mxUtils.htmlEntities(fontUrl) + '");\n}');
+						   		doc.writeln('</style>');
 							}
 						}
 					};
@@ -6756,9 +7117,7 @@
 							var prev = mxClient.NO_FO;
 							mxClient.NO_FO = (this.graph.mathEnabled && !editorUi.editor.useForeignObjectForMath) ?
 								true : editorUi.editor.originalNoForeignObject;
-							
 							var result = printPreviewRenderPage.apply(this, arguments);
-
 							mxClient.NO_FO = prev;
 							
 							if (this.graph.mathEnabled)
@@ -6777,6 +7136,10 @@
 					// Switches stylesheet for print output in dark mode
 					var temp = null;
 					
+					// Disables dashed printing of flowAnimation
+					var enableFlowAnimation = graph.enableFlowAnimation;
+					graph.enableFlowAnimation = false;
+					
 					if (graph.themes != null && graph.defaultThemeName == 'darkTheme')
 					{
 						temp = graph.stylesheet;
@@ -6786,6 +7149,9 @@
 					
 					// Generates the print output
 					pv.open(null, null, forcePageBreaks, true);
+					
+					// Restores flowAnimation
+					graph.enableFlowAnimation = enableFlowAnimation;
 					
 					// Restores the stylesheet
 					if (temp != null)
@@ -6807,24 +7173,27 @@
 					pv.autoOrigin = autoOrigin;
 					pv.appendGraph(thisGraph, scale, x0, y0, forcePageBreaks, true);
 					
-					if (thisGraph.extFonts != null && pv.wnd != null)
+					var extFonts = thisGraph.getCustomFonts();
+					
+					if (pv.wnd != null)
 					{
-						for (var i = 0; i < thisGraph.extFonts.length; i++)
+						for (var i = 0; i < extFonts.length; i++)
 						{
-							var fontName = thisGraph.extFonts[i].name;
-							var fontUrl = thisGraph.extFonts[i].url;
+							var fontName = extFonts[i].name;
+							var fontUrl = extFonts[i].url;
 							
-							if (fontUrl.indexOf(Editor.GOOGLE_FONTS) == 0)
+							if (Graph.isCssFontUrl(fontUrl))
 							{
-						   		pv.wnd.document.writeln('<link rel="stylesheet" href="' + fontUrl + '" charset="UTF-8" type="text/css">');
+						   		pv.wnd.document.writeln('<link rel="stylesheet" href="' +
+						   			mxUtils.htmlEntities(fontUrl) +
+						   			'" charset="UTF-8" type="text/css">');
 							}
 							else
 							{
 						   		pv.wnd.document.writeln('<style type="text/css">');
 						   		pv.wnd.document.writeln('@font-face {\n' +
-							            '\tfont-family: "'+ fontName +'";\n' + 
-							            '\tsrc: url("'+ fontUrl +'");\n' + 
-							            '}');
+						   			'font-family: "' + mxUtils.htmlEntities(fontName) + '";\n' + 
+						   			'src: url("' + mxUtils.htmlEntities(fontUrl) + '");\n}');
 						   		pv.wnd.document.writeln('</style>');
 							}
 						}
@@ -6881,7 +7250,7 @@
 
 					if (tempGraph == null)
 					{
-						tempGraph = editorUi.createTemporaryGraph(graph.stylesheet);//getStylesheet());
+						tempGraph = editorUi.createTemporaryGraph(graph.stylesheet);
 
 						// Restores graph settings that are relevant for printing
 						var pageVisible = true;
@@ -7005,7 +7374,7 @@
 		{
 			var helpBtn = mxUtils.button(mxResources.get('help'), function()
 			{
-				graph.openLink('https://desk.draw.io/support/solutions/articles/16000048947');
+				graph.openLink('https://www.diagrams.net/doc/faq/print-diagram');
 			});
 			
 			helpBtn.className = 'geBtn';

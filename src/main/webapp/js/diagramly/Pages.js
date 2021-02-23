@@ -738,12 +738,17 @@ Graph.prototype.setViewState = function(state, removeOldExtFonts)
 	this.fireEvent(new mxEventObject('viewStateChanged', 'state', state));
 };
 
-//TODO How to make this function secure with no injection??
 Graph.prototype.addExtFont = function(fontName, fontUrl, dontRemember)
 {
 	// KNOWN: Font not added when pasting cells with custom fonts
 	if (fontName && fontUrl)
 	{
+		if (urlParams['ext-fonts'] != '1')
+		{
+			// Adds inserted fonts to font family menu
+			Graph.recentCustomFonts[fontName.toLowerCase()] = {name: fontName, url: fontUrl};
+		}
+		
 		var fontId = 'extFont_' + fontName;
 
 		if (document.getElementById(fontId) == null)
@@ -760,9 +765,8 @@ Graph.prototype.addExtFont = function(fontName, fontUrl, dontRemember)
 				var style = document.createElement('style');
 				
 				style.appendChild(document.createTextNode('@font-face {\n' +
-			            '\tfont-family: "'+ fontName +'";\n' + 
-			            '\tsrc: url("'+ fontUrl +'");\n' + 
-			            '}'));
+					'\tfont-family: "'+ fontName +'";\n' + 
+					'\tsrc: url("'+ fontUrl +'");\n}'));
 				
 				style.setAttribute('id', fontId);
 				var head = document.getElementsByTagName('head')[0];
@@ -1158,7 +1162,7 @@ EditorUi.prototype.updateTabContainer = function()
 		var graph = this.editor.graph;
 		var wrapper = document.createElement('div');
 		wrapper.style.position = 'relative';
-		wrapper.style.display = (mxClient.IS_QUIRKS) ? 'inline' : 'inline-block';
+		wrapper.style.display = 'inline-block';
 		wrapper.style.verticalAlign = 'top';
 		wrapper.style.height = this.tabContainer.style.height;
 		wrapper.style.whiteSpace = 'nowrap';
@@ -1326,7 +1330,7 @@ EditorUi.prototype.isPageInsertTabVisible = function()
 EditorUi.prototype.createTab = function(hoverEnabled)
 {
 	var tab = document.createElement('div');
-	tab.style.display = (mxClient.IS_QUIRKS) ? 'inline' : 'inline-block';
+	tab.style.display = 'inline-block';
 	tab.style.whiteSpace = 'nowrap';
 	tab.style.boxSizing = 'border-box';
 	tab.style.position = 'relative';

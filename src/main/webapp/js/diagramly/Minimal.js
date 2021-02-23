@@ -52,6 +52,7 @@ EditorUi.initMinimalTheme = function()
            'td.mxWindowPane .geSidebarContainer button { padding:2px; box-sizing: border-box; }' +
            'html body .geMenuItem { font-size:14px; text-decoration: none; font-weight: normal; padding: 6px 10px 6px 10px; border: none; border-radius: 5px; color: #353535; box-shadow: inset 0 0 0 1px rgba(0,0,0,.11), inset 0 -1px 0 0 rgba(0,0,0,.08), 0 1px 2px 0 rgba(0,0,0,.04); }' +
            // Styling for Minimal
+           '.geToolbarContainer { background:#fff !important; }' +
            'div.geSidebarContainer { background-color: #ffffff; }' +
            'div.geSidebarContainer .geTitle { background-color:#fdfdfd; }' +
            'div.mxWindow td.mxWindowPane button { background-image: none; float: none; }' +
@@ -498,19 +499,23 @@ EditorUi.initMinimalTheme = function()
 				}
 			}
 
-			button = document.createElement('a');
-			mxUtils.write(button, mxResources.get('exit'));
-			button.setAttribute('title', mxResources.get('exit'));
-			button.className = 'geMenuItem';
-			button.style.marginLeft = '6px';
-			button.style.padding = '6px';
-			
-			mxEvent.addListener(button, 'click', mxUtils.bind(this, function()
+			if (urlParams['noExitBtn'] != '1')
 			{
-				this.actions.get('exit').funct();
-			}));
+				button = document.createElement('a');
+				mxUtils.write(button, mxResources.get('exit'));
+				button.setAttribute('title', mxResources.get('exit'));
+				button.className = 'geMenuItem';
+				button.style.marginLeft = '6px';
+				button.style.padding = '6px';
+				
+				mxEvent.addListener(button, 'click', mxUtils.bind(this, function()
+				{
+					this.actions.get('exit').funct();
+				}));
+				
+				div.appendChild(button);
+			}
 			
-			div.appendChild(button);
 			this.buttonContainer.appendChild(div);
 			this.buttonContainer.style.top = '6px';
 		}
@@ -546,7 +551,7 @@ EditorUi.initMinimalTheme = function()
         
         if (graph.getSelectionCount() == 1)
         {
-            this.addMenuItems(menu, ['-', 'editTooltip', 'editGeometry', '-'], null, evt);
+            this.addMenuItems(menu, ['editTooltip', '-', 'editGeometry', 'edit', '-'], null, evt);
 
             if (graph.isCellFoldable(graph.getSelectionCell()))
             {
@@ -854,7 +859,7 @@ EditorUi.initMinimalTheme = function()
 				
 				if (ui.isOfflineApp())
 				{
-					if (navigator.onLine && urlParams['stealth'] != '1')
+					if (navigator.onLine && urlParams['stealth'] != '1' && urlParams['lockdown'] != '1')
 					{
 						this.addMenuItems(menu, ['upload'], parent);
 					}
@@ -988,7 +993,7 @@ EditorUi.initMinimalTheme = function()
 			if (typeof(MathJax) !== 'undefined')
 			{
 				var item = ui.menus.addMenuItem(menu, 'mathematicalTypesetting', parent);
-				ui.menus.addLinkToItem(item, 'https://desk.draw.io/support/solutions/articles/16000032875');
+				ui.menus.addLinkToItem(item, 'https://www.diagrams.net/doc/faq/math-typesetting');
 			}
 			
             ui.menus.addMenuItems(menu, ['copyConnect', 'collapseExpand', '-', 'pageScale'], parent);
@@ -1007,9 +1012,15 @@ EditorUi.initMinimalTheme = function()
 		div.style.bottom = (urlParams['embed'] != '1' || urlParams['libraries'] == '1') ? '63px' : '32px';
 		this.sidebar = this.createSidebar(div);
      
-		if (iw >= 1000 || urlParams['clibs'] != null || urlParams['libs'] != null)
+		if (iw >= 1000 || urlParams['clibs'] != null || urlParams['libs'] != null || urlParams['search-shapes'] != null)
 		{
 			toggleShapes(this, true);
+			
+			if (this.sidebar != null && urlParams['search-shapes'] != null && this.sidebar.searchShapes != null)
+			{
+				this.sidebar.searchShapes(urlParams['search-shapes']);
+				this.sidebar.showEntries('search');
+			}
 		}
         
 		if (iw >= 1000)
